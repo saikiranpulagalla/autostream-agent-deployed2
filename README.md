@@ -54,6 +54,41 @@ This project demonstrates a real-world GenAI agent that:
 
 ## 🏗️ Architecture
 
+### Why LangGraph (Not AutoGen)?
+
+**LangGraph chosen because:**
+- ✅ **Fine-grained control:** Define exact node flow (agent → RAG/Tool → decision)
+- ✅ **State persistence:** Built-in checkpointer for multi-turn conversations
+- ✅ **Conditional routing:** Tool calling only when ALL fields collected (no mistakes)
+- ✅ **Message history:** Automatic append of LLM responses to state
+- ✅ **Production-ready:** Used by ServiceHive, Anthropic, and enterprise deployments
+
+**AutoGen would be harder for this use case because:**
+- Too much internal orchestration (hard to control lead capture timing)
+- Better for multi-agent debates, not single-agent lead capture
+- Over-engineered for our specific workflow
+
+### State Management (MemorySaver)
+
+```python
+# State persists across ALL conversation turns
+checkpointer = MemorySaver()  # Stores in memory
+app = graph.compile(checkpointer=checkpointer)
+
+# Thread-based isolation (user-specific state)
+thread = {"configurable": {"thread_id": "user_12345"}}
+output = app.invoke(initial_state, thread)
+
+# Can switch to RedisSaver for production scaling
+checkpointer = RedisSaver(redis_conn=redis_client)
+```
+
+**How it works:**
+1. First turn → State stored with thread_id
+2. Second turn → State loaded, updated, re-stored
+3. Fifth turn → Full conversation history still available
+4. No duplicate lead capture (checked via `lead_captured` flag)
+
 ```mermaid
 graph TB
     User["👤 User Input"] --> Intent["🎯 Intent Detection<br/>(LLM Classifier)"]
@@ -494,26 +529,100 @@ class AgentState(TypedDict):
 
 ## 🧪 Testing
 
-### Test Pricing Inquiry
+### Automated Demo (Assignment Scenario)
+
+Matches exact 5-turn flow from assignment:
+
 ```bash
 python main.py
-> Hi, tell me about your pricing.
+# Type 'demo' when prompted
 ```
+
+**Expected output:**
+```
+--- Turn 1 ---
+User: Hi, tell me about your pricing.
+Agent: (RAG retrieves pricing from knowledge base)
+Agent: We have two plans...
+
+--- Turn 2 ---
+User: That sounds good, I want to try the Pro plan for my YouTube channel.
+Agent: (Detects high intent)
+Agent: Great! To get started, please share your name...
+
+--- Turn 3-5 ---
+(Collects name, email, platform)
+Lead captured successfully: John Doe, john@example.com, YouTube
+```
+
+### Test Pricing Inquiry (Product Intent)
+
+```bash
+python main.py
+```
+
+Then type:
+```
+What's your pricing?
+What features do you have?
+Do you offer annual billing?
+```
+
+**Expected:** Agent retrieves from RAG knowledge base, answers accurately
 
 ### Test High-Intent Flow
+
 ```bash
 python main.py
-> I want to try the Pro plan for my YouTube channel.
-> John Doe
-> john@example.com
-> YouTube
 ```
 
-### Test with Streamlit
-1. Click "💬 Test Pricing" button
-2. Click "🎥 Test High Intent" button
-3. Fill form and submit
-4. Watch the trace panel for processing steps
+Then type:
+```
+I want to try the Pro plan for my YouTube channel.
+John Doe
+john@example.com
+YouTube
+```
+
+**Expected:** 
+1. Intent shifts to high_intent
+2. Agent asks for name, email, platform (one at a time)
+3. Tool called after all collected
+4. Success message printed
+
+### Test with Streamlit UI
+
+```bash
+python streamlit_run.py
+```
+
+Then:
+1. Click "💬 Test Pricing Inquiry" button
+2. Chat responds with RAG knowledge
+3. Click "🎥 Test High-Intent Lead"
+4. Fill form progressively
+5. Watch trace panel for execution steps
+
+### Test Conversation Memory
+
+```bash
+python main.py
+```
+
+Try:
+```
+My name is Alice
+What's your Pro plan pricing again?  ← Agent should remember "Alice" and answer pricing
+I want to sign up with the Pro plan
+alice@example.com
+YouTube
+```
+
+**Expected:** Agent should:
+- Remember Alice's name (not ask again)
+- Answer pricing question from RAG
+- Recognize sign-up intent shift
+- Collect remaining details
 
 ---
 
@@ -628,12 +737,57 @@ def send_whatsapp_message(phone: str, text: str):
     requests.post(url, json=payload, headers=headers)
 ```
 
-#### 3. **Deployment Path**
+#### 3. **Environment Setup for WhatsApp**
 
-Start with **Railway.app** (recommended):
+Add these to your `.env` file:
+```bash
+# Google Gemini API
+GOOGLE_API_KEY=AIzaSy...
+
+# Meta WhatsApp API
+WHATSAPP_TOKEN=EAAxxxxxx...
+WHATSAPP_PHONE_ID=123456789
+WEBHOOK_VERIFY_TOKEN=your_custom_verify_token_here
+```
+
+#### 4. **Installation & Deployment**
+
+Install FastAPI & Uvicorn:
+```bash
+pip install fastapi uvicorn
+```
+
+Save the webhook code to `webhook.py` and deploy to a cloud platform:
+
+```bash
+# Local testing
+uvicorn webhook:app --reload --port=8000
+
+# Deploy to Railway.app (recommended)
+# 1. Push code to GitHub
+# 2. Connect Railway to your GitHub repo
+# 3. Add environment variables in Railway dashboard
+# 4. Set webhook URL in Meta Business Manager:
+#    https://your-railway-url.railway.app/webhook
+```
+
+#### 5. **Deployment Path Options**
+
+**Option A: Railway.app** (Recommended)
 - Built-in Redis support for scaling
 - MemorySaver → RedisSaver switch in 2 lines
 - $5-15/month, handles 100+ concurrent users
+- Automatic deployments on git push
+
+**Option B: Render.com**
+- Free tier available for testing
+- Easy environment variable setup
+- Good for prototyping
+
+**Option C: Your Own Server**
+- Full control
+- Higher cost
+- Better for production at scale
 
 ---
 
