@@ -122,7 +122,7 @@ checkpointer = RedisSaver(redis_conn=redis_client)
 
 | Component | Technology | Purpose |
 |-----------|-----------|---------|
-| **Intent Detector** | LangChain + GPT-4o-mini | Classify user intent (product/high/casual) |
+| **Intent Detector** | LangChain + Gemini 2.5 Flash | Classify user intent (product/high/casual) |
 | **RAG Engine** | FAISS + Sentence Transformers | Retrieve knowledge base info without API calls |
 | **State Manager** | LangGraph + MemorySaver | Persist conversation state across turns |
 | **Lead Tool** | LangChain Tool | Mock API for lead capture |
