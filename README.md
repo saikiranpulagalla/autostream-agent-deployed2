@@ -54,6 +54,35 @@ This project demonstrates a real-world GenAI agent that:
 
 ## 🏗️ Architecture
 
+```mermaid
+graph TB
+    User["👤 User Input"] --> Intent["🎯 Intent Detection<br/>(LLM Classifier)"]
+    
+    Intent -->|Product Inquiry| RAG["📚 RAG Retrieval<br/>(FAISS + HF Embeddings)"]
+    Intent -->|High Intent| Form["📋 Lead Collection Form<br/>(Name, Email, Platform)"]
+    Intent -->|Casual| LLM["💬 Conversational Response<br/>(With Context)"]
+    
+    RAG --> Response["✅ Knowledge-Based Response"]
+    Form --> AllCollected{All Fields<br/>Collected?}
+    
+    AllCollected -->|Yes| Tool["🔧 Tool Execution<br/>(Lead Capture)"]
+    AllCollected -->|No| Form
+    
+    LLM --> Response
+    Tool --> Success["🎉 Lead Captured"]
+    Response --> History["📝 Message History<br/>(MemorySaver)"]
+    
+    History -->|Next Turn| Intent
+    Success --> End["✅ End"]
+    
+    style User fill:#E3F2FD,stroke:#1976D2,color:#000
+    style Intent fill:#FFF3E0,stroke:#F57C00,color:#000
+    style RAG fill:#F3E5F5,stroke:#7B1FA2,color:#000
+    style Form fill:#E8F5E9,stroke:#388E3C,color:#000
+    style LLM fill:#FCE4EC,stroke:#C2185B,color:#000
+    style Tool fill:#E0F2F1,stroke:#00897B,color:#000
+    style Success fill:#C8E6C9,stroke:#2E7D32,color:#000
+```
 ### Why LangGraph (Not AutoGen)?
 
 **LangGraph chosen because:**
@@ -88,36 +117,6 @@ checkpointer = RedisSaver(redis_conn=redis_client)
 2. Second turn → State loaded, updated, re-stored
 3. Fifth turn → Full conversation history still available
 4. No duplicate lead capture (checked via `lead_captured` flag)
-
-```mermaid
-graph TB
-    User["👤 User Input"] --> Intent["🎯 Intent Detection<br/>(LLM Classifier)"]
-    
-    Intent -->|Product Inquiry| RAG["📚 RAG Retrieval<br/>(FAISS + HF Embeddings)"]
-    Intent -->|High Intent| Form["📋 Lead Collection Form<br/>(Name, Email, Platform)"]
-    Intent -->|Casual| LLM["💬 Conversational Response<br/>(With Context)"]
-    
-    RAG --> Response["✅ Knowledge-Based Response"]
-    Form --> AllCollected{All Fields<br/>Collected?}
-    
-    AllCollected -->|Yes| Tool["🔧 Tool Execution<br/>(Lead Capture)"]
-    AllCollected -->|No| Form
-    
-    LLM --> Response
-    Tool --> Success["🎉 Lead Captured"]
-    Response --> History["📝 Message History<br/>(MemorySaver)"]
-    
-    History -->|Next Turn| Intent
-    Success --> End["✅ End"]
-    
-    style User fill:#E3F2FD,stroke:#1976D2,color:#000
-    style Intent fill:#FFF3E0,stroke:#F57C00,color:#000
-    style RAG fill:#F3E5F5,stroke:#7B1FA2,color:#000
-    style Form fill:#E8F5E9,stroke:#388E3C,color:#000
-    style LLM fill:#FCE4EC,stroke:#C2185B,color:#000
-    style Tool fill:#E0F2F1,stroke:#00897B,color:#000
-    style Success fill:#C8E6C9,stroke:#2E7D32,color:#000
-```
 
 ### Component Breakdown
 
